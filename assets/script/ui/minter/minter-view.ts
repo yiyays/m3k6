@@ -3,12 +3,13 @@ import EventType = cc.Node.EventType;
 import { Subject } from 'rxjs';
 
 import { log } from '../../common/logger';
-import { ZhugeDice12, ZhugeDice6, ZhugeDice9 } from '../../models/minter';
+import { ZhugeDice } from '../../models/minter';
 import { getRandomInt } from '../../utils/get-random-int';
 import { hideMouseCursor } from '../../utils/hide-mouse-cursor';
 import { hideNode, showNode } from '../../utils/node-utils';
 import { showMouseCursor } from '../../utils/show-mouse-cursor';
-import { getDiceX } from './utils/get-dice-x';
+import RoadView from '../road-view';
+import { getDiceX } from './internat/get-dice-x';
 
 const { ccclass, property } = cc._decorator;
 
@@ -67,9 +68,9 @@ export class MinterView extends cc.Component {
 
   // 是否禁用事件
   enabled = true;
-  state: ZhugeDice6 | ZhugeDice9 | ZhugeDice12;
+  state: ZhugeDice;
   // 道路
-  road: cc.Node;
+  mapRoad: RoadView;
 
   // 骰子事件
   readonly onDice$ = new Subject<number>();
@@ -96,17 +97,30 @@ export class MinterView extends cc.Component {
 
   onLoad(): void {
     this.loadStatus({
-      max: 9,
+      max: 12,
       dice: 6,
     });
+  }
+  protected onDestroy(): void {
+    this.onDice$.complete();
+  }
+
+  disable(): void {
+    this.enabled = false;
+    hideMouseCursor();
+  }
+
+  enable(): void {
+    this.enabled = true;
+    showMouseCursor();
   }
 
   /**
    * 加载骰子控制器状态
    * @param minter
    */
-  loadStatus(minter: ZhugeDice6 | ZhugeDice9 | ZhugeDice12): void {
-    log({ msg: '加载行为控制器状态', channel: '行为控制器', data: minter });
+  loadStatus(minter: ZhugeDice): void {
+    log({ msg: '加载控制器状态', channel: '行为控制器', data: minter });
     const fn = () => {
       this.state = minter;
       this.dice.x = this.getDiceX(this.state.dice);
@@ -222,13 +236,13 @@ export class MinterView extends cc.Component {
     // 注册鼠标进入事件
     el.on(EventType.MOUSE_ENTER, () => {
       if (el === this.dice6Clicked || el === this.dice9Clicked || el === this.dice12Clicked) {
-        showNode(this.road);
+        showNode(this.mapRoad.floor);
       }
     });
     // 注册鼠标离开事件
     el.on(EventType.MOUSE_LEAVE, () => {
       if (el === this.dice6Clicked || el === this.dice9Clicked || el === this.dice12Clicked) {
-        hideNode(this.road);
+        hideNode(this.mapRoad.floor);
       }
     });
   }
@@ -242,8 +256,7 @@ export class MinterView extends cc.Component {
     return new Promise((resolve) => {
       const diceNum = getRandomInt(1, max);
       const callback = cc.callFunc(() => {
-        this.enabled = true;
-        showMouseCursor();
+        this.enable();
         resolve(diceNum);
       });
 
@@ -253,8 +266,7 @@ export class MinterView extends cc.Component {
       const target = cc.moveTo(0.5, diceX, this.dice.y);
       const seq = cc.sequence(push, pull, target, callback); // .easing(cc.easeOut(2));
       this.dice.runAction(cc.speed(seq, 2));
-      hideMouseCursor();
-      this.enabled = false;
+      this.disable();
     });
   }
 }
